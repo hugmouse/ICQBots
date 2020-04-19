@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"time"
 )
+
 func main() {
 	r := regexp.MustCompile("http(?:s?):\\/\\/(?:www\\.)?youtu(?:be\\.com\\/watch\\?v=|\\.be\\/)([\\w\\-\\_]*)(&(amp;)?‌​[\\w\\?‌​=]*)?")
 	title := regexp.MustCompile("<title>(.*?)</title>")
@@ -23,8 +25,7 @@ func main() {
 
 	updates := bot.GetUpdatesChannel(ctx)
 
-
-for update := range updates {
+	for update := range updates {
 		if update.Type == icq.NEW_MESSAGE {
 			switch update.Payload.Text {
 			case "/start":
@@ -87,16 +88,41 @@ for update := range updates {
 				youtubeTitle := title.Find(body)
 				path := string(youtubeTitle[7:len(youtubeTitle)-8]) + ".opus"
 
-				_, err = exec.Command("youtube-dl", "--add-metadata",
-					"--extract-audio", "--print-json", "-o", path, update.Payload.Text).Output()
+				cmdd := exec.Command("youtube-dl", "--add-metadata",
+					"--extract-audio", "--print-json", "-o", path, update.Payload.Text)
 
-				if err != nil {
+				cmdd.Start()
+
+				done := make(chan error)
+				go func() {
+					done <- cmdd.Wait()
+				}()
+
+				// Timeout timer
+				timeout := time.After(10 * time.Second)
+
+				select {
+				case <-timeout:
+					// Timeout happened first,
+					// kill the process and print a message
+					cmdd.Process.Kill()
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
-					err = update.Payload.Message().Reply(err.Error())
+					err = update.Payload.Message().Reply("Sorreh, timed out (timeout is 10 seconds)")
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
 					continue
+				case err := <-done:
+					// Command completed before timeout
+					// Print output and error if it exists
+					if err != nil {
+						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
+						err = update.Payload.Message().Reply(err.Error())
+						if err != nil {
+							logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
+						}
+						continue
+					}
 				}
 
 				file, err := os.Open(path)
@@ -121,7 +147,6 @@ for update := range updates {
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					continue
 				}
-
 
 				err = os.Remove(path)
 				if err != nil {
