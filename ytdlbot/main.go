@@ -16,15 +16,15 @@ func main() {
 	title := regexp.MustCompile("<title>(.*?)</title>")
 	ctx := context.Background()
 
-	bot, err := icq.NewBot("TOKEN_HERE", icq.BotDebug(true))
+	bot, err := icq.NewBot("TOKEN_HERE")
 	if err != nil {
 		log.Println("wrong token")
 	}
 
 	updates := bot.GetUpdatesChannel(ctx)
 
-STARTOVER:
-	for update := range updates {
+
+for update := range updates {
 		if update.Type == icq.NEW_MESSAGE {
 			switch update.Payload.Text {
 			case "/start":
@@ -37,7 +37,7 @@ STARTOVER:
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
-					goto STARTOVER
+					continue
 				}
 			case "/help":
 				// do nothing
@@ -50,7 +50,7 @@ STARTOVER:
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
-					goto STARTOVER
+					continue
 				}
 
 				err = update.Payload.Message().Reply("Started downloading...")
@@ -65,18 +65,18 @@ STARTOVER:
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
-					goto STARTOVER
+					continue
 				}
 
 				if err != nil {
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
-					goto STARTOVER
+					continue
 				}
 
 				body, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
-					goto STARTOVER
+					continue
 				}
 
 				err = resp.Body.Close()
@@ -96,7 +96,7 @@ STARTOVER:
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
-					goto STARTOVER
+					continue
 				}
 
 				file, err := os.Open(path)
@@ -107,19 +107,19 @@ STARTOVER:
 					if err != nil {
 						logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
 					}
-					goto STARTOVER
+					continue
 				}
 
 				err = bot.NewFileMessage(update.Payload.Chat.ID, file).Send()
 				if err != nil {
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
-					goto STARTOVER
+					continue
 				}
 
 				err = file.Close()
 				if err != nil {
 					logrus.WithFields(logrus.Fields{"EventID": update.EventID}).Errorln(err)
-					goto STARTOVER
+					continue
 				}
 
 
